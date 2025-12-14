@@ -7,8 +7,7 @@ input_path = os.path.join(dir_path, "input.txt")
 
 # intersect [a,b] and [c,d]
 def intersect_intervals(i1: tuple[int, int], i2: tuple[int, int]) -> tuple[int, int] | None:
-    a, b = i1
-    c, d = i2
+    a, b, c, d = i1 + i2
     il, ir = max(a, c), min(b, d)
     if il > ir:
         return None
