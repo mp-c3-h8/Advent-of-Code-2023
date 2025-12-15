@@ -5,6 +5,14 @@ from operator import itemgetter
 dir_path = os.path.dirname(os.path.realpath(__file__))
 input_path = os.path.join(dir_path, "input.txt")
 
+FIVE_OF_A_KIND = 7
+FOUR_OF_A_KIND = 6
+FULL_HOUSE = 5
+THREE_OF_A_KIND = 4
+TWO_PAIR = 3
+ONE_PAIR = 2
+HIGH_CARD = 1
+
 
 def get_type(hand: list[int]) -> int:
     counter = Counter(hand)
@@ -13,16 +21,16 @@ def get_type(hand: list[int]) -> int:
     n = max(m, n+m)
 
     match n:
-        case 5:  # five of a kind
-            return 7
-        case 4:  # four of a kind
-            return 6
-        case 3:  # full house or three of a kind
-            return 5 if len(counter) == 2 else 4
-        case 2:  # two pair or one pair
-            return 3 if len(counter) == 3 else 2
-        case 1:  # high card
-            return 1
+        case 5:
+            return FIVE_OF_A_KIND
+        case 4:
+            return FOUR_OF_A_KIND
+        case 3:
+            return FULL_HOUSE if len(counter) == 2 else THREE_OF_A_KIND
+        case 2:
+            return TWO_PAIR if len(counter) == 3 else ONE_PAIR
+        case 1:
+            return HIGH_CARD
         case _:
             return 0
     return 0
