@@ -5,6 +5,7 @@ from operator import itemgetter
 dir_path = os.path.dirname(os.path.realpath(__file__))
 input_path = os.path.join(dir_path, "input.txt")
 
+TABLE = {'T': 10, 'J': 1, 'Q': 12, 'K': 13, 'A': 14}
 FIVE_OF_A_KIND = 7
 FOUR_OF_A_KIND = 6
 FULL_HOUSE = 5
@@ -17,7 +18,7 @@ HIGH_CARD = 1
 def get_type(hand: list[int]) -> int:
     counter = Counter(hand)
     m = counter.pop(1) if 1 in counter else 0  # number of jokers
-    n = most[0][1] if (most := counter.most_common(1)) else 0
+    n = most[0][1] if (most := counter.most_common(1)) else 0  # highest count except jokers
     n = max(m, n+m)
 
     match n:
@@ -37,12 +38,11 @@ def get_type(hand: list[int]) -> int:
 
 
 data = open(input_path).read().splitlines()
-table = {'T': 10, 'J': 1, 'Q': 12, 'K': 13, 'A': 14}
-
 hands: list[tuple[int, list[int], int]] = []  # (type,hand,bid)
+
 for line in data:
     hand_str, bid_str = line.split(' ', 1)
-    hand = [int(c) if c.isdigit() else table[c] for c in hand_str]
+    hand = [int(c) if c.isdigit() else TABLE[c] for c in hand_str]
     hands.append((get_type(hand), hand, int(bid_str)))
 
 ranked = sorted(hands, key=itemgetter(0, 1))

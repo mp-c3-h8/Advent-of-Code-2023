@@ -8,7 +8,7 @@ input_path = os.path.join(dir_path, "input.txt")
 
 def get_type(hand: list[int]) -> int:
     counter = Counter(hand)
-    _, n = counter.most_common(1)[0]
+    n = most[0][1] if (most := counter.most_common(1)) else 0
     match n:
         case 5:  # five of a kind
             return 7
