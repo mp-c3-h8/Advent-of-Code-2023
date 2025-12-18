@@ -57,19 +57,15 @@ def energize(pos: Vec, d: Vec) -> int:
         while pos in grid and (pos, d) not in seen:
             c = grid[pos]
             seen.add((pos, d))
-            if c == '.':
-                pos = (pos[0]+d[0], pos[1]+d[1])
-                continue
-
             new_d = LOOKUP[c][d]
             if len(new_d) == 1:
                 n = new_d[0]
-                pos = (pos[0]+n[0], pos[1]+n[1])
-                d = n
-                continue
+            else:
+                n, n2 = new_d
+                move((pos[0]+n2[0], pos[1]+n2[1]), n2)
 
-            for n in new_d:
-                move((pos[0]+n[0], pos[1]+n[1]), n)
+            pos = (pos[0]+n[0], pos[1]+n[1])
+            d = n
 
     move(pos, d)
     energized = set(p for p, d in seen)
