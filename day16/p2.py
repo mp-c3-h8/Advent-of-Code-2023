@@ -50,10 +50,11 @@ LOOKUP: dict[str, dict[Vec, list[Vec]]] = {
 
 
 def energize(pos: Vec, d: Vec) -> int:
-
     seen: set[tuple[Vec, Vec]] = set()
-
-    def move(pos: Vec, d: Vec) -> None:
+    todo = [(pos, d)]
+    
+    while todo:
+        pos, d = todo.pop()
         while pos in grid and (pos, d) not in seen:
             c = grid[pos]
             seen.add((pos, d))
@@ -62,12 +63,11 @@ def energize(pos: Vec, d: Vec) -> int:
                 n = new_d[0]
             else:
                 n, n2 = new_d
-                move((pos[0]+n2[0], pos[1]+n2[1]), n2)
+                todo.append(((pos[0]+n2[0], pos[1]+n2[1]), n2))
 
             pos = (pos[0]+n[0], pos[1]+n[1])
             d = n
 
-    move(pos, d)
     energized = set(p for p, d in seen)
     return len(energized)
 
