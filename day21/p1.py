@@ -9,6 +9,7 @@ grid = {complex(i, j): c for j, row in enumerate(data) for i, c in enumerate(row
 start = [z for z in grid if grid[z] == 'S'][0]
 
 STEPS = 64
+rem = STEPS % 2
 q = deque([(start, STEPS)])
 seen: defaultdict[complex, int] = defaultdict(int)
 i = 0
@@ -16,7 +17,7 @@ while q:
     i += 1
     pos, steps_left = q.popleft()
 
-    if seen[pos] == steps_left or steps_left < 0:
+    if pos in seen or steps_left < 0:
         continue
     seen[pos] = steps_left
 
@@ -25,5 +26,4 @@ while q:
         if new_pos in grid and grid[new_pos] != '#':
             q.append((new_pos, steps_left-1))
 
-print(i)
-print("Part 1:", len([p for p, s in seen.items() if s == 0]))
+print("Part 1:", sum(s % 2 == rem or s == 0 for p, s in seen.items()))
