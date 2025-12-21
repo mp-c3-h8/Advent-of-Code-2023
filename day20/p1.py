@@ -1,6 +1,20 @@
 import os.path
 from collections import deque
 from abc import ABC, abstractmethod
+from enum import Enum
+from typing import NamedTuple
+
+
+class Pulse(Enum):
+    LOW = False,
+    HIGH = True
+
+
+class Message(NamedTuple):
+    sender: Module
+    receiver: Module
+    pulse: Pulse
+
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 input_path = os.path.join(dir_path, "input.txt")
@@ -10,11 +24,11 @@ configuration_str = open(input_path).read()
 
 class Module(ABC):
     name: str
-    receiver: list[Module]
+    receiver: list[Module] = []
+    next_pulse: Pulse | None = Pulse.LOW
 
-    def __init__(self, name: str, receiver: list[Module] = []) -> None:
+    def __init__(self, name: str) -> None:
         self.name = name
-        self.receiver = receiver
 
     def set_receiver(self, receiver: list[Module]) -> None:
         self.receiver = receiver
@@ -22,103 +36,76 @@ class Module(ABC):
     def set_state(self, state) -> None:
         self.state = state
 
+    def send(self) -> list[Message]:
+        if self.next_pulse is not None:
+            msg = [Message(self, m, self.next_pulse) for m in self.receiver]
+            return msg
+        return []
+
+    def receive_and_send(self, msg: Message) -> list[Message]:
+        self.process(msg.sender, msg.pulse)
+        return self.send()
+
     def info(self) -> None:
         print(f'{self.__class__.__name__}: {self.name} -> {[m.name for m in self.receiver]}')
 
     @abstractmethod
-    def receive(self, fr: Module, pulse: int):
-        pass
-
-    @abstractmethod
-    def get_next(self, pulse: int) -> list[tuple[Module, int]]:
-        pass
-
-    @abstractmethod
-    def get_pulse(self, pulse: int) -> int:
+    def process(self, sender: Module, pulse: Pulse):
         pass
 
 
 class ButtonModule(Module):
 
-    def receive(self, fr: Module, pulse: int) -> None:
+    def process(self, sender: Module, pulse: Pulse):
         pass
-
-    def get_next(self, pulse: int) -> list[tuple[Module, int]]:
-        return [(m, self.get_pulse(pulse)) for m in self.receiver]
-
-    def get_pulse(self, pulse: int) -> int:
-        return 0
 
 
 class DummyModule(Module):
 
-    def receive(self, fr: Module, pulse: int) -> None:
+    def process(self, sender: Module, pulse: Pulse):
         pass
-
-    def get_next(self, pulse: int) -> list[tuple[Module, int]]:
-        return []
-
-    def get_pulse(self, pulse: int) -> int:
-        return 0
 
 
 class BroadcasterModule(Module):
 
-    def receive(self, fr: Module, pulse: int) -> None:
-        pass
-
-    def get_next(self, pulse: int) -> list[tuple[Module, int]]:
-        return [(m, self.get_pulse(pulse)) for m in self.receiver]
-
-    def get_pulse(self, pulse: int) -> int:
-        return pulse
+    def process(self, sender: Module, pulse: Pulse):
+        self.next_pulse = pulse
 
 
 class FlipFlopModule(Module):
     state: bool = False
 
-    def receive(self, fr: Module, pulse: int) -> None:
-        if pulse == 1:
-            pass
+    def process(self, sender: Module, pulse: Pulse):
+        if pulse == Pulse.HIGH:
+            self.next_pulse = None
         else:
             self.state = not self.state
-
-    def get_next(self, pulse: int) -> list[tuple[Module, int]]:
-        if pulse:
-            return []
-        return [(m, self.get_pulse(pulse)) for m in self.receiver]
-
-    def get_pulse(self, pulse: int) -> int:
-        return 1 if self.state else 0
+            self.next_pulse = Pulse.HIGH if self.state else Pulse.LOW
 
 
 class ConjunctionModule(Module):
-    state: dict[Module, int] = {}
+    state: dict[Module, Pulse] = {}
 
-    def receive(self, fr: Module, pulse: int) -> None:
-        self.state[fr] = pulse
-
-    def get_next(self, pulse: int) -> list[tuple[Module, int]]:
-        return [(m, self.get_pulse(pulse)) for m in self.receiver]
-
-    def get_pulse(self, pulse: int) -> int:
-        return 0 if all(s == 1 for s in self.state.values()) else 1
+    def process(self, sender: Module, pulse: Pulse):
+        self.state[sender] = pulse
+        self.next_pulse = Pulse.LOW if all(s == Pulse.HIGH for s in self.state.values()) else Pulse.HIGH
 
 
-class ModuleConfiguration:
+class ModuleManager:
     modules: dict[str, Module] = {}
-    button: ButtonModule = ButtonModule('button')
     low: int = 0
     high: int = 0
-    is_on = False
 
     def __init__(self, init: str) -> None:
         conj: dict[str, set] = {}
+
+        # create modules
+        self.modules['button'] = ButtonModule('button')
         for line in init.splitlines():
             name, receiver_str = line.split(' -> ')
             if name == 'broadcaster':
                 mod = BroadcasterModule(name)
-                self.button.set_receiver([mod])
+                self.modules['button'].set_receiver([mod])
             elif name.startswith('%'):
                 mod = FlipFlopModule(name[1:])
             elif name.startswith('&'):
@@ -128,18 +115,25 @@ class ModuleConfiguration:
                 raise ValueError
             self.modules[name[1:]] = mod
 
+        # set receiver for every module
         for line in init.splitlines():
             name, receiver_str = line.split(' -> ')
-            receiver = [self.modules[n] if n in self.modules else DummyModule(n) for n in receiver_str.split(', ')]
-            mod = self.modules[name[1:]]
-            mod.set_receiver(receiver)
-
+            receiver = []
             for r in receiver_str.split(', '):
                 if r in conj:
                     conj[r].add(name[1:])
+                if r in self.modules:
+                    receiver.append(self.modules[r])
+                else:  # need dummy (rx)
+                    dummy = DummyModule(r)
+                    self.modules[r] = dummy
+                    receiver.append(dummy)
+            mod = self.modules[name[1:]]
+            mod.set_receiver(receiver)
 
+        # init state for conjunction modules
         for n, r in conj.items():
-            self.modules[n].set_state({self.modules[s]: 0 for s in r})
+            self.modules[n].set_state({self.modules[s]: Pulse.LOW for s in r})
 
     def info(self) -> None:
         for name, mod in self.modules.items():
@@ -147,37 +141,24 @@ class ModuleConfiguration:
 
     def push_button(self, n=1) -> None:
         for _ in range(n):
-            start = self.button.get_next(0)
-            init: list[(tuple[Module, Module, int])] = [(self.button,) + start[0]]
-            q = deque(init)
+            q: deque[Message] = deque(self.modules['button'].send())
             while q:
-                source, target, pulse = q.popleft()
-                if target.name == 'rx' and pulse == 0:
-                    self.is_on = True
-                if pulse:
+                message = q.popleft()
+                response = message.receiver.receive_and_send(message)
+                q.extend(response)
+
+                if message.pulse == Pulse.HIGH:
                     self.high += 1
                 else:
                     self.low += 1
-                # print(f'{source.name} {pulse} -> {target.name}')
-                target.receive(source, pulse)
-                for m, p in target.get_next(pulse):
-                    q.append((target, m, p))
+                # print(f'{message.sender.name} {message.pulse} -> {message.receiver.name}')
 
     def score(self) -> int:
         return self.low * self.high
 
-    def turn_on(self) -> int:
-        for i in range(1, 1000):
-            self.push_button()
-            if self.is_on:
-                return i
-        return -1
 
-
-mconfig = ModuleConfiguration(configuration_str)
-mconfig.push_button(1000)
-print("Part 1:", mconfig.score())
-
-mconfig = ModuleConfiguration(configuration_str)
-ans = mconfig.turn_on()
-print("Part 2:", ans)
+manager = ModuleManager(configuration_str)
+# print(manager.info())
+manager.push_button(1000)
+print("Part 1:", manager.score())
+print("Part 2:",)
