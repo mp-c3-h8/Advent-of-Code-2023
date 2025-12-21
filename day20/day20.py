@@ -167,7 +167,8 @@ class ModuleManager:
     def part2(self) -> int:
         # manual inspection of input data:
         # rx is connected to a single conj (AND) module
-        # that module has 4 inputs -> get cycles of those and calc lcm
+        # that module has 4 inputs with each being a cyclic subgraph
+        # find the period of each subgraph calc their lcm
         rx = self.modules['rx']
         conjs = [mod for mod in self.modules.values() if rx in mod.receiver]
         assert (len(conjs) == 1)
