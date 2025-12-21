@@ -3,6 +3,7 @@ from collections import deque
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import NamedTuple
+from math import lcm
 
 
 class Pulse(Enum):
@@ -26,9 +27,11 @@ class Module(ABC):
     name: str
     receiver: list[Module] = []
     next_pulse: Pulse | None = Pulse.LOW
+    state: dict[Module, bool]
 
     def __init__(self, name: str) -> None:
         self.name = name
+        self.state = {self: False}
 
     def set_receiver(self, receiver: list[Module]) -> None:
         self.receiver = receiver
@@ -37,17 +40,20 @@ class Module(ABC):
         self.state = state
 
     def send(self) -> list[Message]:
-        if self.next_pulse is not None:
-            msg = [Message(self, m, self.next_pulse) for m in self.receiver]
-            return msg
-        return []
+        if self.next_pulse is None:
+            return []
+        return [Message(self, m, self.next_pulse) for m in self.receiver]
 
     def receive_and_send(self, msg: Message) -> list[Message]:
         self.process(msg.sender, msg.pulse)
         return self.send()
 
-    def info(self) -> None:
-        print(f'{self.__class__.__name__}: {self.name} -> {[m.name for m in self.receiver]}')
+    def __str__(self) -> str:
+        return f'{self.__class__.__name__}: {self.name} -> {[m.name for m in self.receiver]}'
+
+    def reset(self) -> None:
+        self.next_pulse = Pulse.LOW
+        self.state = {m: False for m in self.state}
 
     @abstractmethod
     def process(self, sender: Module, pulse: Pulse):
@@ -73,22 +79,20 @@ class BroadcasterModule(Module):
 
 
 class FlipFlopModule(Module):
-    state: bool = False
 
     def process(self, sender: Module, pulse: Pulse):
         if pulse == Pulse.HIGH:
             self.next_pulse = None
         else:
-            self.state = not self.state
-            self.next_pulse = Pulse.HIGH if self.state else Pulse.LOW
+            self.state[self] = not self.state[self]
+            self.next_pulse = Pulse.HIGH if self.state[self] else Pulse.LOW
 
 
 class ConjunctionModule(Module):
-    state: dict[Module, Pulse] = {}
 
     def process(self, sender: Module, pulse: Pulse):
-        self.state[sender] = pulse
-        self.next_pulse = Pulse.LOW if all(s == Pulse.HIGH for s in self.state.values()) else Pulse.HIGH
+        self.state[sender] = True if pulse == Pulse.HIGH else False
+        self.next_pulse = Pulse.LOW if all(s == True for s in self.state.values()) else Pulse.HIGH
 
 
 class ModuleManager:
@@ -112,7 +116,7 @@ class ModuleManager:
                 mod = ConjunctionModule(name[1:])
                 conj[name[1:]] = set()
             else:
-                raise ValueError
+                raise ValueError(f'Module Identifier unknown: {name}')
             self.modules[name[1:]] = mod
 
         # set receiver for every module
@@ -137,7 +141,7 @@ class ModuleManager:
 
     def info(self) -> None:
         for name, mod in self.modules.items():
-            mod.info()
+            print(mod)
 
     def push_button(self, n=1) -> None:
         for _ in range(n):
@@ -156,9 +160,38 @@ class ModuleManager:
     def score(self) -> int:
         return self.low * self.high
 
+    def reset(self) -> None:
+        for mod in self.modules.values():
+            mod.reset()
+
+    def part2(self) -> int:
+        # manual inspection of input data:
+        # rx is connected to a single conj (AND) module
+        # that module has 4 inputs -> get cycles of those and calc lcm
+        rx = self.modules['rx']
+        conjs = [mod for mod in self.modules.values() if rx in mod.receiver]
+        assert (len(conjs) == 1)
+        conj = conjs[0]
+        assert (type(conj) == ConjunctionModule)
+        inputs = [mod for mod in conj.state.keys()]
+
+        self.reset()
+        cycles = {mod: [] for mod in inputs}
+        for i in range(1, 10_000):
+            q: deque[Message] = deque(self.modules['button'].send())
+
+            while q:
+                msg = q.popleft()
+                response = msg.receiver.receive_and_send(msg)
+                q.extend(response)
+
+                if msg.pulse == Pulse.HIGH and msg.sender in cycles:
+                    cycles[msg.sender].append(i)
+        return lcm(*map(min, cycles.values()))
+
 
 manager = ModuleManager(configuration_str)
 # print(manager.info())
 manager.push_button(1000)
 print("Part 1:", manager.score())
-print("Part 2:",)
+print("Part 2:", manager.part2())
