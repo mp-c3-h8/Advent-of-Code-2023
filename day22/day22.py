@@ -75,11 +75,9 @@ def plot_bricks(bricks: list[Brick], figure: int = 1) -> None:
         YZ[brick.z, brick.y] = brick.id
 
     plt.figure(figure)
-    ax1 = plt.subplot(1, 2, 1)
-    ax1.imshow(XZ, origin='lower', cmap="tab20b")
-
-    ax2 = plt.subplot(1, 2, 2)
-    ax2.imshow(YZ, origin='lower', cmap="tab20b")
+    for i, M in enumerate((XZ, YZ), 1):
+        ax = plt.subplot(1, 2, i)
+        ax.imshow(M, origin='lower', cmap="tab20b")
 
 
 def falling(bricks: list[Brick]) -> None:
