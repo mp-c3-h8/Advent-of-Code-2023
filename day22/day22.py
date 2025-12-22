@@ -1,7 +1,8 @@
 import os.path
 from operator import attrgetter
 from dataclasses import dataclass, field
-from collections import deque
+from heapq import heapify, heappush, heappop
+
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 input_path = os.path.join(dir_path, "input.txt")
@@ -49,7 +50,7 @@ for brick in bricks:
             brick.fall(brick.z.start - 1)
         continue
 
-    # can have multiple supports think brick wall
+    # can have multiple supports like a brick wall
     brick_max = max(collision, key=attrgetter('z.stop'))
     supports = [other for other in collision if other.z.stop == brick_max.z.stop]
     brick.supported_by = supports
@@ -67,24 +68,26 @@ print("Part 1:", len(disintegrate))
 
 
 def chain_reaction(start: Brick) -> int:
-    q = deque(start.supports)
+    q = [(0, s.id, s,) for s in start.supports]
+    heapify(q)  # prio = z-distance to start of reaction
     seen: set[int] = set()
-    desintegrated: set[int] = set((start.id,))
+    disintegrated: set[int] = set((start.id,))
     while q:
-        brick = q.popleft()
+        _, _, brick = heappop(q)
 
-        # if brick.id in seen:
-        #     continue
-        # seen.add(brick.id)
+        if brick.id in seen:
+            continue
+        seen.add(brick.id)
 
-        remaining_support = set(b.id for b in brick.supported_by).difference(desintegrated)
+        remaining_support = set(b.id for b in brick.supported_by).difference(disintegrated)
         if remaining_support:
             continue
 
-        desintegrated.add(brick.id)
-        for supp in sorted(brick.supports, key=attrgetter('x.stop')):
-            q.append(supp)
-    return len(desintegrated) - 1
+        disintegrated.add(brick.id)
+        for supp in brick.supports:
+            heappush(q, (supp.z.start-start.z.stop, supp.id, supp))
+
+    return len(disintegrated) - 1
 
 
 print("Part 2:", sum(chain_reaction(brick) for brick in bricks))
