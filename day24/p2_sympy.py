@@ -18,7 +18,7 @@ for line in data[:3]:
     V.append(v)
 
 
-x, y, z, vx, vy, vz = symbols('x y z vx vy vz')
+unknown = x, y, z, vx, vy, vz = symbols('x y z vx vy vz')
 equations = []
 ts = []
 
@@ -33,7 +33,7 @@ for i, (p, u) in enumerate(zip(P, V)):
     equations.extend([eqx, eqy, eqz])
     ts.append(t)
 
-res = solve_poly_system(equations, *([x, y, z, vx, vy, vz]+ts))
+res = solve_poly_system(equations, list(unknown)+ts)
 
 if res:
     print('Part2:', sum(p for p in res[0][:3]))
